@@ -100,7 +100,7 @@ function make_mpfr_impl(fn::Expr, mod::Module, rounding_mode::Bool, rest::Expr..
         elseif argtype isa Union
             push!(types, promote_type(Base.uniontypes(argtype)...))
         else
-            push!(types, :(Ref{$argtype}))
+            push!(types, Ref{argtype})
         end
     end
     return quote
@@ -111,10 +111,10 @@ function make_mpfr_impl(fn::Expr, mod::Module, rounding_mode::Bool, rest::Expr..
             ccall(
                 ($(QuoteNode(fn_name)), :libmpfr),
                 Int32,
-                ($(types...), $((typeof(s) for s in surplus_args)...), $((rounding_mode ? (:(_MPFRRoundingMode),) : ())...)),
+                ($(types...), $((typeof(s) for s in surplus_args)...), $((rounding_mode ? (:($_MPFRRoundingMode),) : ())...)),
                 $((return_type <: Tuple ? (:(out[$i]) for i in 1:fieldcount(return_type)) : (:out,))...),
                 $(argnames...), $(surplus_args...),
-                $((rounding_mode ? (:(Base.MPFR.ROUNDING_MODE[]),) : ())...),
+                $((rounding_mode ? (:($(Base.Rounding.rounding_raw)($BigFloat)),) : ())...),
             )
             $post
             return out
