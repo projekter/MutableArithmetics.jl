@@ -32,11 +32,17 @@ const _MPFRMachineInteger = Union{_MPFRMachineSigned,_MPFRMachineUnsigned}
 const _MPFRMachineFloat = Base.GMP.CdoubleMax
 
 make_mpfr_error() = error("Invalid use of @make_mpfr")
-function make_mpfr_impl(fn::Expr, mod::Module, rounding_mode::Bool, rest::Expr...)
+function make_mpfr_impl(
+    fn::Expr,
+    mod::Module,
+    rounding_mode::Bool,
+    rest::Expr...,
+)
     pre = :()
     post = :()
     for restᵢ in rest
-        restᵢ isa Expr && restᵢ.head === :(=) && length(restᵢ.args) == 2 || make_mpfr_error()
+        restᵢ isa Expr && restᵢ.head === :(=) && length(restᵢ.args) == 2 ||
+            make_mpfr_error()
         if restᵢ.args[1] === :pre
             pre = restᵢ.args[2]
         elseif restᵢ.args[1] === :post
@@ -48,7 +54,8 @@ function make_mpfr_impl(fn::Expr, mod::Module, rounding_mode::Bool, rest::Expr..
     fn.head === :(->) || make_mpfr_error()
     if fn.args[2] isa Expr
         # Julia likes to insert a line number node
-        (fn.args[2].head === :block && fn.args[2].args[1] isa LineNumberNode) || make_mpfr_error()
+        (fn.args[2].head === :block && fn.args[2].args[1] isa LineNumberNode) ||
+            make_mpfr_error()
         fn_name = fn.args[2].args[end]
     else
         fn_name = fn.args[2]
@@ -76,13 +83,20 @@ function make_mpfr_impl(fn::Expr, mod::Module, rounding_mode::Bool, rest::Expr..
     catch
         return :() # some functions may not be known in all Julia versions - this is not an error
     end
-    args = sizehint!(Any[], length(fn.args) -1)
-    argnames = sizehint!(Symbol[], length(fn.args) -1)
-    types = sizehint!(Any[], length(fn.args) + (return_type === BigFloat ? 0 : fieldcount(return_type) -1))
+    args = sizehint!(Any[], length(fn.args) - 1)
+    argnames = sizehint!(Symbol[], length(fn.args) - 1)
+    types = sizehint!(
+        Any[],
+        length(fn.args) +
+        (return_type === BigFloat ? 0 : fieldcount(return_type) - 1),
+    )
     if return_type === BigFloat
         push!(types, Ref{BigFloat})
     else
-        append!(types, Iterators.repeated(Ref{BigFloat}, fieldcount(return_type)))
+        append!(
+            types,
+            Iterators.repeated(Ref{BigFloat}, fieldcount(return_type)),
+        )
     end
     for (i, argᵢ) in enumerate(Iterators.drop(fn.args, 1))
         argᵢ isa Expr && argᵢ.head === :(::) || make_mpfr_error()
@@ -92,7 +106,8 @@ function make_mpfr_impl(fn::Expr, mod::Module, rounding_mode::Bool, rest::Expr..
             push!(args, Expr(:(::), argtype))
             continue
         end
-        argname = length(argᵢ.args) == 2 ? argᵢ.args[1]::Symbol : Symbol(:arg, i)
+        argname =
+            length(argᵢ.args) == 2 ? argᵢ.args[1]::Symbol : Symbol(:arg, i)
         push!(args, Expr(:(::), argname, argtype))
         push!(argnames, argname)
         if isbitstype(argtype)
@@ -104,17 +119,38 @@ function make_mpfr_impl(fn::Expr, mod::Module, rounding_mode::Bool, rest::Expr..
         end
     end
     return quote
-        promote_operation(::typeof($ju_name), $((:(::Type{<:$(arg.args[end])}) for arg in args)...)) = $return_type
+        function promote_operation(
+            ::typeof($ju_name),
+            $((:(::Type{<:$(arg.args[end])}) for arg in args)...),
+        )
+            return $return_type
+        end
 
         function operate_to!(out::$return_type, ::typeof($ju_name), $(args...))
             $pre
             ccall(
                 ($(QuoteNode(fn_name)), :libmpfr),
                 Int32,
-                ($(types...), $((typeof(s) for s in surplus_args)...), $((rounding_mode ? (:($_MPFRRoundingMode),) : ())...)),
-                $((return_type <: Tuple ? (:(out[$i]) for i in 1:fieldcount(return_type)) : (:out,))...),
-                $(argnames...), $(surplus_args...),
-                $((rounding_mode ? (:($(Base.Rounding.rounding_raw)($BigFloat)),) : ())...),
+                (
+                    $(types...),
+                    $((typeof(s) for s in surplus_args)...),
+                    $((rounding_mode ? (:($_MPFRRoundingMode),) : ())...),
+                ),
+                $(
+                    (
+                        return_type <: Tuple ?
+                        (:(out[$i]) for i in 1:fieldcount(return_type)) :
+                        (:out,)
+                    )...
+                ),
+                $(argnames...),
+                $(surplus_args...),
+                $(
+                    (
+                        rounding_mode ?
+                        (:($(Base.Rounding.rounding_raw)($BigFloat)),) : ()
+                    )...
+                ),
             )
             $post
             return out
@@ -123,11 +159,11 @@ function make_mpfr_impl(fn::Expr, mod::Module, rounding_mode::Bool, rest::Expr..
 end
 
 macro make_mpfr(fn::Expr, rest::Expr...)
-    esc(make_mpfr_impl(fn, __module__, true, rest...))
+    return esc(make_mpfr_impl(fn, __module__, true, rest...))
 end
 
 macro make_mpfr_noround(fn::Expr, rest::Expr...)
-    esc(make_mpfr_impl(fn, __module__, false, rest...))
+    return esc(make_mpfr_impl(fn, __module__, false, rest...))
 end
 
 # copy
@@ -157,7 +193,8 @@ operate!(::typeof(one), x::BigFloat) = operate_to!(x, copy, 1)
 # ldexp
 
 @make_mpfr ldexp(::_MPFRMachineSigned, ::_MPFRMachineSigned) -> mpfr_set_si_2exp
-@make_mpfr ldexp(::_MPFRMachineUnsigned, ::_MPFRMachineSigned) -> mpfr_set_ui_2exp
+@make_mpfr ldexp(::_MPFRMachineUnsigned, ::_MPFRMachineSigned) ->
+    mpfr_set_ui_2exp
 @make_mpfr ldexp(::BigFloat, ::_MPFRMachineSigned) -> mpfr_mul_2si
 @make_mpfr ldexp(::BigFloat, ::_MPFRMachineUnsigned) -> mpfr_mul_2ui
 
@@ -259,17 +296,34 @@ end
 for f in (:log, :log2, :log10)
     @eval @make_mpfr $f(x::BigFloat) -> $(Symbol(:mpfr_, f)) pre=begin
         if x < 0
-            throw(DomainError(x, string($f, " was called with a negative real argument but ",
-                              "will only return a complex result if called ",
-                              "with a complex argument. Try ", $f, "(complex(x)).")))
+            throw(
+                DomainError(
+                    x,
+                    string(
+                        $f,
+                        " was called with a negative real argument but ",
+                        "will only return a complex result if called ",
+                        "with a complex argument. Try ",
+                        $f,
+                        "(complex(x)).",
+                    ),
+                ),
+            )
         end
     end
 end
 @make_mpfr log1p(x::BigFloat) -> mpfr_log1p pre=begin
     if x < -1
-        throw(DomainError(x, string("log1p was called with a real argument < -1 but ",
-                          "will only return a complex result if called ",
-                          "with a complex argument. Try log1p(complex(x)).")))
+        throw(
+            DomainError(
+                x,
+                string(
+                    "log1p was called with a real argument < -1 but ",
+                    "will only return a complex result if called ",
+                    "with a complex argument. Try log1p(complex(x)).",
+                ),
+            ),
+        )
     end
 end
 
@@ -287,8 +341,21 @@ end
 
 # trigonometric
 # Functions for which NaN results are converted to DomainError, following Base
-for f in (:sin, :cos, :tan, :cot, :sec, :csc, :acos, :asin, :atan, :acosh, :asinh, :atanh,
-          (VERSION ≥ v"1.10" ? (:sinpi, :cospi, :tanpi) : ())...)
+for f in (
+    :sin,
+    :cos,
+    :tan,
+    :cot,
+    :sec,
+    :csc,
+    :acos,
+    :asin,
+    :atan,
+    :acosh,
+    :asinh,
+    :atanh,
+    (VERSION ≥ v"1.10" ? (:sinpi, :cospi, :tanpi) : ())...,
+)
     @eval @make_mpfr $f(x::BigFloat) -> $(Symbol(:mpfr_, f)) pre=begin
         isnan(x) && return operate_to!(out, copy, x)
     end post=begin
@@ -298,13 +365,15 @@ end
 @make_mpfr sincos(::BigFloat)::Tuple{BigFloat,BigFloat} -> mpfr_sin_cos
 VERSION ≥ v"1.10" && for f in (:sin, :cos, :tan)
     @eval begin
-        @make_mpfr $(Symbol(f, :d))(x::BigFloat) -> ($(Symbol(:mpfr_, f, :u)), 0x00000168) pre=begin
+        @make_mpfr $(Symbol(f, :d))(x::BigFloat) ->
+            ($(Symbol(:mpfr_, f, :u)), 0x00000168) pre=begin
             isnan(x) && return operate_to!(out, copy, x)
         end post=begin
             isnan(out) && throw(DomainError(x, "NaN result for non-NaN input."))
         end
 
-        @make_mpfr $(Symbol(:a, f, :d))(x::BigFloat) -> ($(Symbol(:mpfr_a, f, :u)), 0x00000168) pre=begin
+        @make_mpfr $(Symbol(:a, f, :d))(x::BigFloat) ->
+            ($(Symbol(:mpfr_a, f, :u)), 0x00000168) pre=begin
             isnan(x) && return operate_to!(out, copy, x)
         end post=begin
             isnan(out) && throw(DomainError(x, "NaN result for non-NaN input."))
@@ -312,7 +381,8 @@ VERSION ≥ v"1.10" && for f in (:sin, :cos, :tan)
     end
 end
 @make_mpfr atan(::BigFloat, ::BigFloat) -> mpfr_atan2
-VERSION ≥ v"1.10" && @make_mpfr atand(::BigFloat, ::BigFloat) -> (mpfr_atan2u, 0x00000168)
+VERSION ≥ v"1.10" &&
+    @make_mpfr atand(::BigFloat, ::BigFloat) -> (mpfr_atan2u, 0x00000168)
 
 # hyperbolic
 @make_mpfr cosh(::BigFloat) -> mpfr_cosh
@@ -327,11 +397,15 @@ VERSION ≥ v"1.10" && @make_mpfr atand(::BigFloat, ::BigFloat) -> (mpfr_atan2u,
 @make_mpfr_noround round(::BigFloat, ::RoundingMode{:Up}) -> mpfr_ceil
 @make_mpfr_noround round(::BigFloat, ::RoundingMode{:Down}) -> mpfr_floor
 @make_mpfr_noround round(::BigFloat, ::RoundingMode{:ToZero}) -> mpfr_trunc
-@make_mpfr_noround round(::BigFloat, ::RoundingMode{:NearestTiesAway}) -> mpfr_round
+@make_mpfr_noround round(::BigFloat, ::RoundingMode{:NearestTiesAway}) ->
+    mpfr_round
 
-@make_mpfr modf(::BigFloat)::Tuple{BigFloat,BigFloat} -> mpfr_modf pre=(out = reverse(out)) post=(out = reverse(out))
+@make_mpfr modf(::BigFloat)::Tuple{BigFloat,BigFloat} -> mpfr_modf pre=(
+    out = reverse(out)
+) post=(out = reverse(out))
 @make_mpfr rem(::BigFloat, ::BigFloat) -> mpfr_fmod
-@make_mpfr rem(::BigFloat, ::BigFloat, ::RoundingMode{:Nearest}) -> mpfr_remainder
+@make_mpfr rem(::BigFloat, ::BigFloat, ::RoundingMode{:Nearest}) ->
+    mpfr_remainder
 
 # miscellaneous
 @make_mpfr min(::BigFloat, ::BigFloat) -> mpfr_min

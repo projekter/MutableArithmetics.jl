@@ -1,7 +1,12 @@
 @testset "MPFR wrappers" begin
     # call MA.operate_to!(out, op, args...) and compare with expected. If Base throws for
     # the inputs, assert MA throws the same kind of error.
-    function check_op_matches_expected(op, args...; out=BigFloat(), expected=missing)
+    function check_op_matches_expected(
+        op,
+        args...;
+        out = BigFloat(),
+        expected = missing,
+    )
         # preserve originals for mutation checks
         old_args = MA.copy_if_mutable.(args)
 
@@ -45,11 +50,11 @@
         check_op_matches_expected(copy, big"12.")
         check_op_matches_expected(copy, -12)
         check_op_matches_expected(copy, UInt(12))
-        check_op_matches_expected(copy, 12f0)
-        check_op_matches_expected(copy, 12.)
+        check_op_matches_expected(copy, 12.0f0)
+        check_op_matches_expected(copy, 12.0)
 
-        check_op_matches_expected(ldexp, -5, 3; expected=ldexp(-5., 3))
-        check_op_matches_expected(ldexp, UInt(5), 3; expected=ldexp(5., 3))
+        check_op_matches_expected(ldexp, -5, 3; expected = ldexp(-5.0, 3))
+        check_op_matches_expected(ldexp, UInt(5), 3; expected = ldexp(5.0, 3))
         check_op_matches_expected(ldexp, big"5.", -3)
         check_op_matches_expected(ldexp, big"5.", UInt(3))
 
@@ -62,15 +67,15 @@
         check_op_matches_expected(-, big"1.5", big"2.5")
         check_op_matches_expected(-, big"1.5", Int32(-42))
         check_op_matches_expected(-, big"1.5", 0x6525)
-        check_op_matches_expected(-, big"1.5", 17.)
+        check_op_matches_expected(-, big"1.5", 17.0)
         check_op_matches_expected(-, Int16(-62), big"1.5")
         check_op_matches_expected(-, 0x73764fa, big"1.5")
-        check_op_matches_expected(-, 24., big"1.5")
+        check_op_matches_expected(-, 24.0, big"1.5")
 
         check_op_matches_expected(*, big"63.6", big"91.")
         check_op_matches_expected(*, big"63.6", Int32(-52))
         check_op_matches_expected(*, big"63.6", 0x53d2a)
-        check_op_matches_expected(*, big"63.6", 8f3)
+        check_op_matches_expected(*, big"63.6", 8.0f3)
 
         for dividend in (58, 0)
             check_op_matches_expected(/, big"5352.5", BigFloat(dividend))
@@ -126,7 +131,11 @@
             check_op_matches_expected(tand, big"30.0")
             check_op_matches_expected(tand, big"90.")
         end
-        check_op_matches_expected(sincos, big"0.5"; out=(BigFloat(), BigFloat()))
+        check_op_matches_expected(
+            sincos,
+            big"0.5";
+            out = (BigFloat(), BigFloat()),
+        )
         check_op_matches_expected(sec, big"0.7")
         check_op_matches_expected(csc, big"0.7")
         check_op_matches_expected(cot, big"0.7")
@@ -151,15 +160,25 @@
         check_op_matches_expected(asinh, big"0.5")
         check_op_matches_expected(atanh, big"0.3")
 
-        for rm in (RoundNearest, RoundUp, RoundDown, RoundToZero, RoundNearestTiesAway)
+        for rm in (
+            RoundNearest,
+            RoundUp,
+            RoundDown,
+            RoundToZero,
+            RoundNearestTiesAway,
+        )
             check_op_matches_expected(round, big"24.", rm)
         end
 
-        check_op_matches_expected(modf, big"3.1415"; out=(BigFloat(), BigFloat()))
+        check_op_matches_expected(
+            modf,
+            big"3.1415";
+            out = (BigFloat(), BigFloat()),
+        )
         check_op_matches_expected(rem, big"7.5", big"2.3")
         check_op_matches_expected(rem, big"7.5", big"2.3", RoundNearest)
         check_op_matches_expected(min, big"1.2", big"2.3")
         check_op_matches_expected(max, big"1.2", big"2.3")
-        check_op_matches_expected(copysign, big"-1.2", big"2.0")
+        return check_op_matches_expected(copysign, big"-1.2", big"2.0")
     end
 end
