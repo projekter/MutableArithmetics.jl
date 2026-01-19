@@ -328,7 +328,7 @@ end
 @make_mpfr_noround round(::BigFloat, ::RoundingMode{:ToZero}) -> mpfr_trunc
 @make_mpfr_noround round(::BigFloat, ::RoundingMode{:NearestTiesAway}) -> mpfr_round
 
-@make_mpfr modf(::BigFloat)::Tuple{BigFloat,BigFloat} -> mpfr_modf
+@make_mpfr modf(::BigFloat)::Tuple{BigFloat,BigFloat} -> mpfr_modf pre=(out = reverse(out)) post=(out = reverse(out))
 @make_mpfr rem(::BigFloat, ::BigFloat) -> mpfr_fmod
 @make_mpfr rem(::BigFloat, ::BigFloat, ::RoundingMode{:Nearest}) -> mpfr_remainder
 
