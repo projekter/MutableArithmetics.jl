@@ -228,7 +228,11 @@ operate!(::typeof(*), a::BigFloat) = a
 @make_mpfr /(::_MPFRMachineFloat, ::BigFloat) -> mpfr_d_div
 
 # roots
-@make_mpfr sqrt(::BigFloat) -> mpfr_sqrt
+@make_mpfr sqrt(x::BigFloat) -> mpfr_sqrt pre=begin
+    isnan(x) && return operate_to!(out, copy, x)
+end post=begin
+    isnan(out) && throw(DomainError(x, "NaN result for non-NaN input"))
+end
 @make_mpfr sqrt(::_MPFRMachineUnsigned) -> mpfr_sqrt_ui
 @make_mpfr cbrt(::BigFloat) -> mpfr_cbrt
 @make_mpfr fourthroot(::BigFloat) -> (mpfr_rootn_ui, 0x00000004)
@@ -251,11 +255,23 @@ end
 
 # log
 
-@make_mpfr log(::BigFloat) -> mpfr_log
 @make_mpfr log(::_MPFRMachineUnsigned) -> mpfr_log_ui
-@make_mpfr log2(::BigFloat) -> mpfr_log2
-@make_mpfr log10(::BigFloat) -> mpfr_log10
-@make_mpfr log1p(::BigFloat) -> mpfr_log1p
+for f in (:log, :log2, :log10)
+    @eval @make_mpfr $f(x::BigFloat) -> $(Symbol(:mpfr_, f)) pre=begin
+        if x < 0
+            throw(DomainError(x, string($f, " was called with a negative real argument but ",
+                              "will only return a complex result if called ",
+                              "with a complex argument. Try ", $f, "(complex(x)).")))
+        end
+    end
+end
+@make_mpfr log1p(x::BigFloat) -> mpfr_log1p pre=begin
+    if x < -1
+        throw(DomainError(x, string("log1p was called with a real argument < -1 but ",
+                          "will only return a complex result if called ",
+                          "with a complex argument. Try log1p(complex(x)).")))
+    end
+end
 
 # exp
 
@@ -270,26 +286,31 @@ end
 @make_mpfr ^(::BigFloat, ::_MPFRMachineUnsigned) -> mpfr_pow_ui
 
 # trigonometric
-@make_mpfr cos(::BigFloat) -> mpfr_cos
-@make_mpfr sin(::BigFloat) -> mpfr_sin
-@make_mpfr tan(::BigFloat) -> mpfr_tan
-@make_mpfr cospi(::BigFloat) -> mpfr_cospi
-@make_mpfr sinpi(::BigFloat) -> mpfr_sinpi
-@make_mpfr tanpi(::BigFloat) -> mpfr_tanpi
-@make_mpfr cosd(::BigFloat) -> (mpfr_cosu, 0x00000168)
-@make_mpfr sind(::BigFloat) -> (mpfr_sinu, 0x00000168)
-@make_mpfr tand(::BigFloat) -> (mpfr_tanu, 0x00000168)
+# Functions for which NaN results are converted to DomainError, following Base
+for f in (:sin, :cos, :tan, :cot, :sec, :csc, :acos, :asin, :atan, :acosh, :asinh, :atanh, :sinpi, :cospi, :tanpi)
+    @eval @make_mpfr $f(x::BigFloat) -> $(Symbol(:mpfr_, f)) pre=begin
+        isnan(x) && return operate_to!(out, copy, x)
+    end post=begin
+        isnan(out) && throw(DomainError(x, "NaN result for non-NaN input."))
+    end
+end
 @make_mpfr sincos(::BigFloat)::Tuple{BigFloat,BigFloat} -> mpfr_sin_cos
-@make_mpfr sec(::BigFloat) -> mpfr_sec
-@make_mpfr csc(::BigFloat) -> mpfr_csc
-@make_mpfr cot(::BigFloat) -> mpfr_cot
-@make_mpfr acos(::BigFloat) -> mpfr_acos
-@make_mpfr asin(::BigFloat) -> mpfr_asin
-@make_mpfr atan(::BigFloat) -> mpfr_atan
+for f in (:sin, :cos, :tan)
+    @eval begin
+        @make_mpfr $(Symbol(f, :d))(x::BigFloat) -> ($(Symbol(:mpfr_, f, :u)), 0x00000168) pre=begin
+            isnan(x) && return operate_to!(out, copy, x)
+        end post=begin
+            isnan(out) && throw(DomainError(x, "NaN result for non-NaN input."))
+        end
+
+        @make_mpfr $(Symbol(:a, f, :d))(x::BigFloat) -> ($(Symbol(:mpfr_a, f, :u)), 0x00000168) pre=begin
+            isnan(x) && return operate_to!(out, copy, x)
+        end post=begin
+            isnan(out) && throw(DomainError(x, "NaN result for non-NaN input."))
+        end
+    end
+end
 @make_mpfr atan(::BigFloat, ::BigFloat) -> mpfr_atan2
-@make_mpfr acosd(::BigFloat) -> (mpfr_acosu, 0x00000168)
-@make_mpfr asind(::BigFloat) -> (mpfr_asinu, 0x00000168)
-@make_mpfr atand(::BigFloat) -> (mpfr_atanu, 0x00000168)
 @make_mpfr atand(::BigFloat, ::BigFloat) -> (mpfr_atan2u, 0x00000168)
 
 # hyperbolic
@@ -299,9 +320,6 @@ end
 @make_mpfr sech(::BigFloat) -> mpfr_sech
 @make_mpfr csch(::BigFloat) -> mpfr_csch
 @make_mpfr coth(::BigFloat) -> mpfr_coth
-@make_mpfr acosh(::BigFloat) -> mpfr_acosh
-@make_mpfr asinh(::BigFloat) -> mpfr_asinh
-@make_mpfr atanh(::BigFloat) -> mpfr_atanh
 
 # integer/remainder
 @make_mpfr_noround round(::BigFloat, ::RoundingMode{:Nearest}) -> mpfr_roundeven
