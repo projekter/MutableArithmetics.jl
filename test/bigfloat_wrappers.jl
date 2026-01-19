@@ -85,7 +85,7 @@
         check_op_matches_expected(sqrt, big"646.4")
         check_op_matches_expected(sqrt, 0x16)
         check_op_matches_expected(cbrt, big"652.6")
-        @isdefined(fourthroot) && check_op_matches_expected(fourthroot, big"746.3")
+        VERSION ≥ v"1.10" && check_op_matches_expected(fourthroot, big"746.3")
 
         check_op_matches_expected(factorial, 0x12)
 
@@ -116,14 +116,16 @@
         check_op_matches_expected(cos, big"0.5")
         check_op_matches_expected(sin, big"0.5")
         check_op_matches_expected(tan, big"0.5")
-        check_op_matches_expected(cospi, big"0.5")
-        check_op_matches_expected(sinpi, big"0.5")
-        check_op_matches_expected(tanpi, big"0.125")
-        check_op_matches_expected(tanpi, big"0.5")
-        check_op_matches_expected(cosd, big"60.0")
-        check_op_matches_expected(sind, big"30.0")
-        check_op_matches_expected(tand, big"30.0")
-        check_op_matches_expected(tand, big"90.")
+        if VERSION ≥ v"1.10"
+            check_op_matches_expected(cospi, big"0.5")
+            check_op_matches_expected(sinpi, big"0.5")
+            check_op_matches_expected(tanpi, big"0.125")
+            check_op_matches_expected(tanpi, big"0.5")
+            check_op_matches_expected(cosd, big"60.0")
+            check_op_matches_expected(sind, big"30.0")
+            check_op_matches_expected(tand, big"30.0")
+            check_op_matches_expected(tand, big"90.")
+        end
         check_op_matches_expected(sincos, big"0.5"; out=(BigFloat(), BigFloat()))
         check_op_matches_expected(sec, big"0.7")
         check_op_matches_expected(csc, big"0.7")
@@ -132,10 +134,12 @@
         check_op_matches_expected(asin, big"0.5")
         check_op_matches_expected(atan, big"0.5")
         check_op_matches_expected(atan, big"0.5", big"0.9")
-        check_op_matches_expected(acosd, big"0.5")
-        check_op_matches_expected(asind, big"0.5")
-        check_op_matches_expected(atand, big"0.5")
-        check_op_matches_expected(atand, big"0.5", big"0.9")
+        if VERSION ≥ v"1.10"
+            check_op_matches_expected(acosd, big"0.5")
+            check_op_matches_expected(asind, big"0.5")
+            check_op_matches_expected(atand, big"0.5")
+            check_op_matches_expected(atand, big"0.5", big"0.9")
+        end
 
         check_op_matches_expected(cosh, big"0.5")
         check_op_matches_expected(sinh, big"0.5")

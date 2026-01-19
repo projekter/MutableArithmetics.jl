@@ -287,7 +287,8 @@ end
 
 # trigonometric
 # Functions for which NaN results are converted to DomainError, following Base
-for f in (:sin, :cos, :tan, :cot, :sec, :csc, :acos, :asin, :atan, :acosh, :asinh, :atanh, :sinpi, :cospi, :tanpi)
+for f in (:sin, :cos, :tan, :cot, :sec, :csc, :acos, :asin, :atan, :acosh, :asinh, :atanh,
+          (VERSION ≥ v"1.10" ? (:sinpi, :cospi, :tanpi) : ())...)
     @eval @make_mpfr $f(x::BigFloat) -> $(Symbol(:mpfr_, f)) pre=begin
         isnan(x) && return operate_to!(out, copy, x)
     end post=begin
@@ -295,7 +296,7 @@ for f in (:sin, :cos, :tan, :cot, :sec, :csc, :acos, :asin, :atan, :acosh, :asin
     end
 end
 @make_mpfr sincos(::BigFloat)::Tuple{BigFloat,BigFloat} -> mpfr_sin_cos
-for f in (:sin, :cos, :tan)
+VERSION ≥ v"1.10" && for f in (:sin, :cos, :tan)
     @eval begin
         @make_mpfr $(Symbol(f, :d))(x::BigFloat) -> ($(Symbol(:mpfr_, f, :u)), 0x00000168) pre=begin
             isnan(x) && return operate_to!(out, copy, x)
@@ -311,7 +312,7 @@ for f in (:sin, :cos, :tan)
     end
 end
 @make_mpfr atan(::BigFloat, ::BigFloat) -> mpfr_atan2
-@make_mpfr atand(::BigFloat, ::BigFloat) -> (mpfr_atan2u, 0x00000168)
+VERSION ≥ v"1.10" && @make_mpfr atand(::BigFloat, ::BigFloat) -> (mpfr_atan2u, 0x00000168)
 
 # hyperbolic
 @make_mpfr cosh(::BigFloat) -> mpfr_cosh
