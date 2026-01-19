@@ -168,7 +168,7 @@ operate!(::typeof(one), x::BigFloat) = operate_to!(x, copy, 1)
 @make_mpfr +(::BigFloat, ::_MPFRMachineUnsigned) -> mpfr_add_ui
 @make_mpfr +(::BigFloat, ::_MPFRMachineFloat) -> mpfr_add_d
 
-operate_to!(out::BigFloat, ::typeof(+), a::Union{BigFloat,_MPFRMachineNumber}) = operate_to!(out, copy, a)
+operate_to!(out::BigFloat, ::typeof(+), a::Real) = operate_to!(out, copy, a)
 
 operate!(::typeof(+), a::BigFloat) = a
 
@@ -189,7 +189,7 @@ function operate!(::typeof(-), x::BigFloat)
     return x
 end
 
-function operate_to!(o::BigFloat, ::typeof(-), x::Union{BigFloat,_MPFRMachineNumber})
+function operate_to!(o::BigFloat, ::typeof(-), x::Real)
     operate_to!(o, copy, x)
     return operate!(-, o)
 end
@@ -201,7 +201,7 @@ function operate!(::typeof(abs), x::BigFloat)
     return x
 end
 
-function operate_to!(o::BigFloat, ::typeof(abs), x::Union{BigFloat,_MPFRMachineNumber})
+function operate_to!(o::BigFloat, ::typeof(abs), x::Real)
     operate_to!(o, copy, x)
     return operate!(abs, o)
 end
@@ -213,7 +213,7 @@ end
 @make_mpfr *(::BigFloat, ::_MPFRMachineUnsigned) -> mpfr_mul_ui
 @make_mpfr *(::BigFloat, ::_MPFRMachineFloat) -> mpfr_mul_d
 
-operate_to!(out::BigFloat, ::typeof(*), a::Union{BigFloat,_MPFRMachineNumber}) = operate_to!(out, copy, a)
+operate_to!(out::BigFloat, ::typeof(*), a::Real) = operate_to!(out, copy, a)
 
 operate!(::typeof(*), a::BigFloat) = a
 
@@ -348,8 +348,8 @@ function operate_to!(
     output::BigFloat,
     op::Union{typeof(+),typeof(-),typeof(*)},
     a::BigFloat,
-    b::Union{BigFloat,_MPFRMachineNumber},
-    c::Vararg{Union{BigFloat,_MPFRMachineNumber},N},
+    b::Real,
+    c::Vararg{Real,N},
 ) where {N}
     operate_to!(output, op, a, b)
     return operate!(op, output, c...)
