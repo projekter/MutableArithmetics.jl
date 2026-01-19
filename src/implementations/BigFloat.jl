@@ -31,7 +31,7 @@ const _MPFRMachineUnsigned = Union{UInt8,UInt16,UInt32} # and here, UInt
 const _MPFRMachineNumber = Union{_MPFRMachineSigned,_MPFRMachineUnsigned}
 
 make_mpfr_error() = error("Invalid use of @make_mpfr")
-function make_mpfr_impl(fn::Expr, rounding_mode::Bool)
+function make_mpfr_impl(fn::Expr, mod::Module, rounding_mode::Bool)
     fn.head === :(->) || make_mpfr_error()
     if fn.args[2] isa Expr
         # Julia likes to insert a line number node
@@ -50,7 +50,7 @@ function make_mpfr_impl(fn::Expr, rounding_mode::Bool)
     fn_name isa Symbol || make_mpfr_error()
     fn = fn.args[1]::Expr
     if fn.head === :(::)
-        return_type = eval(fn.args[2])
+        return_type = mod.eval(fn.args[2])
         return_type <: Tuple{Vararg{BigFloat}} || make_mpfr_error()
         fn = fn.args[1]::Expr
     else
@@ -58,6 +58,11 @@ function make_mpfr_impl(fn::Expr, rounding_mode::Bool)
     end
     fn.head === :call || make_mpfr_error()
     ju_name = fn.args[1]
+    try
+        mod.eval(ju_name) isa Base.Callable || make_mpfr_error()
+    catch
+        return :() # some functions may not be known in all Julia versions - this is not an error
+    end
     args = sizehint!(Any[], length(fn.args) -1)
     argnames = sizehint!(Symbol[], length(fn.args) -1)
     types = sizehint!(Any[], length(fn.args) + (return_type === BigFloat ? 0 : fieldcount(return_type) -1))
@@ -82,7 +87,7 @@ function make_mpfr_impl(fn::Expr, rounding_mode::Bool)
             push!(argnames, argname)
             push!(types, UInt32)
         else
-            argtype = eval(argtype)
+            argtype = mod.eval(argtype)
             if Base.issingletontype(argtype)
                 push!(args, Expr(:(::), argtype))
                 continue
@@ -116,11 +121,11 @@ function make_mpfr_impl(fn::Expr, rounding_mode::Bool)
 end
 
 macro make_mpfr(fn::Expr)
-    esc(make_mpfr_impl(fn, true))
+    esc(make_mpfr_impl(fn, __module__, true))
 end
 
 macro make_mpfr_noround(fn::Expr)
-    esc(make_mpfr_impl(fn, false))
+    esc(make_mpfr_impl(fn, __module__, false))
 end
 
 # copy
