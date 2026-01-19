@@ -83,11 +83,11 @@
         end
 
         check_op_matches_expected(sqrt, big"646.4")
-        check_op_matches_expected(sqrt, 0x16)
+        check_op_matches_expected(sqrt, 0x12)
         check_op_matches_expected(cbrt, big"652.6")
         VERSION ≥ v"1.10" && check_op_matches_expected(fourthroot, big"746.3")
 
-        check_op_matches_expected(factorial, 0x12)
+        check_op_matches_expected(factorial, 0xc)
 
         check_op_matches_expected(fma, big"1.2", big"2.3", big"0.7")
 
