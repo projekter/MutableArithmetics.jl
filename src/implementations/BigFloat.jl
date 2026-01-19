@@ -136,6 +136,9 @@ end
 @make_mpfr copy(::_MPFRMachineSigned) -> mpfr_set_si
 @make_mpfr copy(::_MPFRMachineUnsigned) -> mpfr_set_ui
 # the Julia MPFR library does not come with the set_sj/set_uj functions
+@make_mpfr copy(::Float32) -> mpfr_set_flt
+@make_mpfr copy(::Float64) -> mpfr_set_d
+@make_mpfr copy(x::Float16) -> mpfr_set_flt pre=(x = Float32(x))
 
 operate!(::typeof(copy), x::BigFloat) = x
 
@@ -163,6 +166,7 @@ operate!(::typeof(one), x::BigFloat) = operate_to!(x, copy, 1)
 @make_mpfr +(::BigFloat, ::BigFloat) -> mpfr_add
 @make_mpfr +(::BigFloat, ::_MPFRMachineSigned) -> mpfr_add_si
 @make_mpfr +(::BigFloat, ::_MPFRMachineUnsigned) -> mpfr_add_ui
+@make_mpfr +(::BigFloat, ::_MPFRMachineFloat) -> mpfr_add_d
 
 operate_to!(out::BigFloat, ::typeof(+), a::Union{BigFloat,_MPFRMachineNumber}) = operate_to!(out, copy, a)
 
@@ -173,8 +177,10 @@ operate!(::typeof(+), a::BigFloat) = a
 @make_mpfr -(::BigFloat, ::BigFloat) -> mpfr_sub
 @make_mpfr -(::BigFloat, ::_MPFRMachineSigned) -> mpfr_sub_si
 @make_mpfr -(::BigFloat, ::_MPFRMachineUnsigned) -> mpfr_sub_ui
+@make_mpfr -(::BigFloat, ::_MPFRMachineFloat) -> mpfr_sub_d
 @make_mpfr -(::_MPFRMachineSigned, ::BigFloat) -> mpfr_si_sub
 @make_mpfr -(::_MPFRMachineUnsigned, ::BigFloat) -> mpfr_ui_sub
+@make_mpfr -(::_MPFRMachineFloat, ::BigFloat) -> mpfr_d_sub
 
 promote_operation(::typeof(-), ::Type{BigFloat}) = BigFloat
 
@@ -205,6 +211,7 @@ end
 @make_mpfr *(::BigFloat, ::BigFloat) -> mpfr_mul
 @make_mpfr *(::BigFloat, ::_MPFRMachineSigned) -> mpfr_mul_si
 @make_mpfr *(::BigFloat, ::_MPFRMachineUnsigned) -> mpfr_mul_ui
+@make_mpfr *(::BigFloat, ::_MPFRMachineFloat) -> mpfr_mul_d
 
 operate_to!(out::BigFloat, ::typeof(*), a::Union{BigFloat,_MPFRMachineNumber}) = operate_to!(out, copy, a)
 
@@ -215,8 +222,10 @@ operate!(::typeof(*), a::BigFloat) = a
 @make_mpfr /(::BigFloat, ::BigFloat) -> mpfr_div
 @make_mpfr /(::BigFloat, ::_MPFRMachineSigned) -> mpfr_div_si
 @make_mpfr /(::BigFloat, ::_MPFRMachineUnsigned) -> mpfr_div_ui
+@make_mpfr /(::BigFloat, ::_MPFRMachineFloat) -> mpfr_div_d
 @make_mpfr /(::_MPFRMachineSigned, ::BigFloat) -> mpfr_si_div
 @make_mpfr /(::_MPFRMachineUnsigned, ::BigFloat) -> mpfr_ui_div
+@make_mpfr /(::_MPFRMachineFloat, ::BigFloat) -> mpfr_d_div
 
 # roots
 @make_mpfr sqrt(::BigFloat) -> mpfr_sqrt
