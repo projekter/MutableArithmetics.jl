@@ -26,12 +26,25 @@ else
 end
 
 const _MPFRRoundingMode = Base.MPFR.MPFRRoundingMode
-const _MPFRMachineSigned = Union{Int8,Int16,Int32} # for convenience, @make_mpfr will also accept Int with this annotation
-const _MPFRMachineUnsigned = Union{UInt8,UInt16,UInt32} # and here, UInt
-const _MPFRMachineNumber = Union{_MPFRMachineSigned,_MPFRMachineUnsigned}
+const _MPFRMachineSigned = Base.GMP.ClongMax
+const _MPFRMachineUnsigned = Base.GMP.CulongMax
+const _MPFRMachineInteger = Union{_MPFRMachineSigned,_MPFRMachineUnsigned}
+const _MPFRMachineFloat = Base.GMP.CdoubleMax
 
 make_mpfr_error() = error("Invalid use of @make_mpfr")
-function make_mpfr_impl(fn::Expr, mod::Module, rounding_mode::Bool)
+function make_mpfr_impl(fn::Expr, mod::Module, rounding_mode::Bool, rest::Expr...)
+    pre = :()
+    post = :()
+    for restᵢ in rest
+        restᵢ isa Expr && restᵢ.head === :(=) && length(restᵢ.args) == 2 || make_mpfr_error()
+        if restᵢ.args[1] === :pre
+            pre = restᵢ.args[2]
+        elseif restᵢ.args[1] === :post
+            post = restᵢ.args[2]
+        else
+            make_mpfr_error()
+        end
+    end
     fn.head === :(->) || make_mpfr_error()
     if fn.args[2] isa Expr
         # Julia likes to insert a line number node
@@ -71,42 +84,30 @@ function make_mpfr_impl(fn::Expr, mod::Module, rounding_mode::Bool)
     else
         append!(types, Iterators.repeated(Ref{BigFloat}, fieldcount(return_type)))
     end
-    for i in 2:length(fn.args)
-        fn.args[i] isa Expr && fn.args[i].head === :(::) || make_mpfr_error()
-        # special handling of _MPFRMachineSigned/_MPFRMachineUnsigned - we want to accept Int/UInt as arguments as well for
-        # comfort, but the function must then implicitly convert. And we only consider the literal constant, avoid this
-        # behavior by specifying the union directly.
-        argtype = fn.args[i].args[end]
-        argname = Symbol(:arg, i -1)
-        if argtype === :_MPFRMachineSigned
-            push!(args, Expr(:(::), argname, Union{_MPFRMachineSigned,Int}))
-            push!(argnames, argname)
-            push!(types, Int32)
-        elseif argtype === :_MPFRMachineUnsigned
-            push!(args, Expr(:(::), argname, Union{_MPFRMachineUnsigned,UInt}))
-            push!(argnames, argname)
-            push!(types, UInt32)
+    for (i, argᵢ) in enumerate(Iterators.drop(fn.args, 1))
+        argᵢ isa Expr && argᵢ.head === :(::) || make_mpfr_error()
+        argtype = mod.eval(argᵢ.args[end])
+        # singleton types may be used for method disambiguation - we only need them on the Julia side
+        if Base.issingletontype(argtype)
+            push!(args, Expr(:(::), argtype))
+            continue
+        end
+        argname = length(argᵢ.args) == 2 ? argᵢ.args[1]::Symbol : Symbol(:arg, i)
+        push!(args, Expr(:(::), argname, argtype))
+        push!(argnames, argname)
+        if isbitstype(argtype)
+            push!(types, argtype)
+        elseif argtype isa Union
+            push!(types, promote_type(Base.uniontypes(argtype)...))
         else
-            argtype = mod.eval(argtype)
-            if Base.issingletontype(argtype)
-                push!(args, Expr(:(::), argtype))
-                continue
-            end
-            push!(args, Expr(:(::), argname, argtype))
-            push!(argnames, argname)
-            if isbitstype(argtype)
-                push!(types, argtype)
-            elseif argtype isa Union
-                push!(types, promote_type(Base.uniontypes(argtype)...))
-            else
-                push!(types, :(Ref{$argtype}))
-            end
+            push!(types, :(Ref{$argtype}))
         end
     end
     return quote
         promote_operation(::typeof($ju_name), $((:(::Type{<:$(arg.args[end])}) for arg in args)...)) = $return_type
 
         function operate_to!(out::$return_type, ::typeof($ju_name), $(args...))
+            $pre
             ccall(
                 ($(QuoteNode(fn_name)), :libmpfr),
                 Int32,
@@ -115,17 +116,18 @@ function make_mpfr_impl(fn::Expr, mod::Module, rounding_mode::Bool)
                 $(argnames...), $(surplus_args...),
                 $((rounding_mode ? (:(Base.MPFR.ROUNDING_MODE[]),) : ())...),
             )
+            $post
             return out
         end
     end
 end
 
-macro make_mpfr(fn::Expr)
-    esc(make_mpfr_impl(fn, __module__, true))
+macro make_mpfr(fn::Expr, rest::Expr...)
+    esc(make_mpfr_impl(fn, __module__, true, rest...))
 end
 
-macro make_mpfr_noround(fn::Expr)
-    esc(make_mpfr_impl(fn, __module__, false))
+macro make_mpfr_noround(fn::Expr, rest::Expr...)
+    esc(make_mpfr_impl(fn, __module__, false, rest...))
 end
 
 # copy
